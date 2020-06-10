@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Auto Dogs</string>
+    <string name="empty_list_hint">Use the button below and load beautiful dog images!</string>
+
+    <string name="error_generic_msg">Ops! Something went wrong…</string>
+    <string name="save_share_msg">Do you wish to save or share this image?</string>
+    <string name="save">Save</string>
+    <string name="share">Share</string>
+    <string name="cancel">Cancel</string>
+    <string name="image_saved">Image Saved!</string>
+
+</resources>
