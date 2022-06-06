@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -14,6 +15,7 @@ import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
@@ -29,6 +31,7 @@ import org.koin.androidx.viewmodel.ext.android.sharedViewModel
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 
 
 class MainFragment : BaseFragment() {
@@ -41,6 +44,17 @@ class MainFragment : BaseFragment() {
     private var lastSelectedImage: String? = null
 
     private val adapter by lazy { MainAdapter(::onImageClicked, ::onImageLongClicked) }
+
+    private var requestCode: Int? = null
+    private val requestPermissionResult = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            if (requestCode == REQUEST_CODE_CHECK_PERMISSIONS_SHARE) {
+                shareImage(lastSelectedImage!!)
+            } else {
+                saveImage(lastSelectedImage!!)
+            }
+        }
+    }
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -66,6 +80,10 @@ class MainFragment : BaseFragment() {
             viewModel.loadNewImage() }
         binding.listImages.adapter = adapter
 
+        observeLiveData()
+    }
+
+    private fun observeLiveData() {
         viewModel.dogImageLiveData.observe(viewLifecycleOwner) {
             binding.loading.visibility = View.GONE
             it?.result?.let { images ->
@@ -102,11 +120,8 @@ class MainFragment : BaseFragment() {
         if (checkWritePermissions()) {
             getImageBitmap(imageUrl) { saveImageBitmap(it) }
         } else {
-            ActivityCompat.requestPermissions(
-                requireActivity(),
-                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                REQUEST_CODE_CHECK_PERMISSIONS_SAVE
-            )
+            requestCode = REQUEST_CODE_CHECK_PERMISSIONS_SAVE
+            requestPermissionResult.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
     }
 
@@ -115,28 +130,18 @@ class MainFragment : BaseFragment() {
         val ctx = context ?: return
         if (checkWritePermissions()) {
             getImageBitmap(imageUrl) {
-                val path = saveImageBitmap(it)
-                Timber.d("Image path? $path")
-                path?.let { imagePath ->
-                    val uri = FileProvider.getUriForFile(
-                        ctx,
-                        "com.daniribalbert.autodogs.fileprovider",
-                        File(imagePath)
-                    )
-                    Intent(Intent.ACTION_SEND).apply {
-                        type = "image/*"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                    }.also { intent ->
-                        startActivity(Intent.createChooser(intent, "Share Image"))
-                    }
+                val uri = saveImageBitmap(it)
+                Timber.d("Image path? ${uri?.path}")
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "image/*"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                }.also { intent ->
+                    startActivity(Intent.createChooser(intent, "Share Image"))
                 }
             }
         } else {
-            ActivityCompat.requestPermissions(
-                requireActivity(),
-                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                REQUEST_CODE_CHECK_PERMISSIONS_SHARE
-            )
+            requestCode = REQUEST_CODE_CHECK_PERMISSIONS_SHARE
+            requestPermissionResult.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
 
     }
@@ -147,24 +152,41 @@ class MainFragment : BaseFragment() {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    private fun saveImageBitmap(imageBitmap: Bitmap): String? {
+    private fun saveImageBitmap(imageBitmap: Bitmap): Uri? {
         val filePath = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val resolver = context?.contentResolver
             val contentValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, "doggo_${System.currentTimeMillis()}.jpg")
-                put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                put(MediaStore.Images.Media.DISPLAY_NAME, "doggo_${System.currentTimeMillis()}.jpg")
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
                 put(
-                    MediaStore.MediaColumns.RELATIVE_PATH,
-                    Environment.DIRECTORY_DCIM + File.separator + getString(R.string.app_name)
+                    MediaStore.Images.Media.RELATIVE_PATH,
+                    Environment.DIRECTORY_PICTURES + File.separator + getString(R.string.app_name)
                 )
             }
 
             val uri = resolver?.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-            Timber.d("Image Saved to: ${uri?.path}")
-            uri?.path
+            try {
+                uri?.let {
+                    val stream = resolver.openOutputStream(it)
+                    val imageSaved = imageBitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream)
+                    stream?.flush()
+                    stream?.close()
+                    if (!imageSaved) {
+                        throw IOException("Failed to save bitmap.")
+                    }
+                }
+            } catch (exception: IOException) {
+                Timber.e(exception, "Failed to save bitmap!")
+                uri?.let {
+                    resolver.delete(uri, null, null)
+                }
+            }
+
+            Timber.d("Image Saved to - Android Q+: ${uri?.path}")
+            uri
         } else {
             val outputDir = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES),
                 getString(R.string.app_name)
             )
             if (!outputDir.exists()) outputDir.mkdirs()
@@ -177,11 +199,17 @@ class MainFragment : BaseFragment() {
             fileOutputStream.flush()
             fileOutputStream.close()
 
-            Timber.d("Image Saved to: ${imageFile.path}")
-            imageFile.path
+            Timber.d("Image Saved to Legacy: ${imageFile.path}")
+            FileProvider.getUriForFile(
+                requireContext(),
+                "com.daniribalbert.autodogs.fileprovider",
+                File(imageFile.path)
+            )
         }
 
-        if (filePath != null) context?.let { showShortToast(it, getString(R.string.image_saved))  }
+        if (filePath != null) {
+            context?.let { showShortToast(it, getString(R.string.image_saved))  }
+        }
         return filePath
     }
 
@@ -197,21 +225,6 @@ class MainFragment : BaseFragment() {
 
         }
         Glide.with(ctx).asBitmap().load(imageUrl).into(target)
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            if (requestCode == REQUEST_CODE_CHECK_PERMISSIONS_SHARE) {
-                shareImage(lastSelectedImage!!)
-            } else {
-                saveImage(lastSelectedImage!!)
-            }
-        }
     }
 
     interface FragmentInteractionListener {
