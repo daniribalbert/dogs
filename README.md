@@ -9,6 +9,10 @@ Auto dogs is a sample project that uses the Dog CEO API (https://dog.ceo/api/) t
 This is handled with the help of Retrofit. The best library to handle that.
 
 ### Image Loading
-Images are loading using Glide. Because was also an option, but Glide was used for its disk cache capabilities.
+Images are loading using Glide. Fast, powerful and offers caching!
 
-This will continue later...
+### Koin
+Dependecy Injection! Koin provides DI without all the boilerplate from dagger.
+
+### Coroutines
+Easy concurrency done with full kotlin support
