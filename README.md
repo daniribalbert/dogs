@@ -1,4 +1,4 @@
-# AUTO DOGS
+# Dogs!
 
 ### Project Description
 Auto dogs is a sample project that uses the Dog CEO API (https://dog.ceo/api/) to load images of dogs and display them on a list. Everyone loves dogs, right?
