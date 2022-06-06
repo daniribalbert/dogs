@@ -1,13 +1,11 @@
 package com.daniribalbert.autodogs.ui.main
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.recyclerview.widget.RecyclerView
-import com.daniribalbert.autodogs.R
+import com.daniribalbert.autodogs.databinding.ItemDogBinding
 import com.daniribalbert.autodogs.utils.extensions.loadImageUrl
-import kotlinx.android.synthetic.main.item_dog.view.*
 
 class MainAdapter(val onClick: (String) -> Unit, val onLongClick: (String) -> Unit) :
     RecyclerView.Adapter<RecyclerView.ViewHolder>() {
@@ -15,8 +13,8 @@ class MainAdapter(val onClick: (String) -> Unit, val onLongClick: (String) -> Un
     private val imageList = mutableListOf<String>()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_dog, parent, false)
-        return UserViewHolder(view)
+        val inflater = LayoutInflater.from(parent.context)
+        return UserViewHolder(ItemDogBinding.inflate(inflater, parent, false))
     }
 
     override fun getItemCount() = imageList.size
@@ -36,14 +34,14 @@ class MainAdapter(val onClick: (String) -> Unit, val onLongClick: (String) -> Un
         return false
     }
 
-    private inner class UserViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+    private inner class UserViewHolder(binding: ItemDogBinding) : RecyclerView.ViewHolder(binding.root) {
 
-        val image: ImageView = view.image
+        val image: ImageView = binding.image
 
         init {
-            image.setOnClickListener { onClick.invoke(imageList[adapterPosition]) }
+            image.setOnClickListener { onClick.invoke(imageList[bindingAdapterPosition]) }
             image.setOnLongClickListener {
-                onLongClick.invoke(imageList[adapterPosition])
+                onLongClick.invoke(imageList[bindingAdapterPosition])
                 true
             }
         }

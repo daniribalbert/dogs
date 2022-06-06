@@ -1,6 +1,5 @@
 package com.daniribalbert.autodogs.ui.main
 
-import androidx.databinding.ObservableBoolean
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,9 +10,7 @@ import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
 
-class MainViewModel(val dogsUseCase: ILoadDogUseCase) : ViewModel() {
-
-    val loading = ObservableBoolean(false)
+class MainViewModel(private val dogsUseCase: ILoadDogUseCase) : ViewModel() {
 
     val dogImageLiveData = MutableLiveData<BaseResult<MutableList<String>>>()
 
@@ -22,10 +19,8 @@ class MainViewModel(val dogsUseCase: ILoadDogUseCase) : ViewModel() {
     }
 
     fun loadNewImage() {
-        loading.set(true)
         viewModelScope.launch {
             dogsUseCase.loadRandomDogImage().let {
-                loading.set(false)
                 val data = dogImageLiveData.value?.result ?: mutableListOf()
                 it.result?.let { dog -> data.add(dog.imageUrl) }
                 dogImageLiveData.postValue(

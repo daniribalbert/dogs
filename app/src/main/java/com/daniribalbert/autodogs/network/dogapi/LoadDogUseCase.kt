@@ -6,8 +6,9 @@ import com.daniribalbert.autodogs.network.api.thedogapi.TheDogApiRepository
 import com.daniribalbert.autodogs.network.model.ApiError
 import com.daniribalbert.autodogs.network.model.DogInfo
 
-class LoadDogUseCase(val theDogApiRepository: TheDogApiRepository,
-                     val dogCEORepository: DogCEORepository
+class LoadDogUseCase(
+    private val theDogApiRepository: TheDogApiRepository,
+    private val dogCEORepository: DogCEORepository
 ): ILoadDogUseCase {
 
     override suspend fun loadRandomDogImage(): BaseResult<DogInfo> {

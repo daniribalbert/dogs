@@ -17,8 +17,6 @@ import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
-import androidx.databinding.DataBindingUtil
-import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.target.CustomTarget
@@ -27,7 +25,6 @@ import com.daniribalbert.autodogs.R
 import com.daniribalbert.autodogs.databinding.MainFragmentBinding
 import com.daniribalbert.autodogs.ui.base.BaseFragment
 import com.daniribalbert.autodogs.utils.extensions.showShortToast
-import kotlinx.android.synthetic.main.main_fragment.*
 import org.koin.androidx.viewmodel.ext.android.sharedViewModel
 import timber.log.Timber
 import java.io.File
@@ -37,11 +34,11 @@ import java.io.FileOutputStream
 class MainFragment : BaseFragment() {
 
     private val viewModel: MainViewModel by sharedViewModel()
-    lateinit var binding: MainFragmentBinding
+    private lateinit var binding: MainFragmentBinding
 
-    lateinit var listener: FragmentInteractionListener
+    private lateinit var listener: FragmentInteractionListener
 
-    var lastSelectedImage: String? = null
+    private var lastSelectedImage: String? = null
 
     private val adapter by lazy { MainAdapter(::onImageClicked, ::onImageLongClicked) }
 
@@ -58,36 +55,33 @@ class MainFragment : BaseFragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        binding = DataBindingUtil.inflate(inflater, R.layout.main_fragment, container, false)
+        binding = MainFragmentBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        fab_add.setOnClickListener { viewModel.loadNewImage() }
-        list_images.adapter = adapter
-    }
+        binding.fabAdd.setOnClickListener {
+            binding.loading.visibility = View.VISIBLE
+            viewModel.loadNewImage() }
+        binding.listImages.adapter = adapter
 
-    override fun onActivityCreated(savedInstanceState: Bundle?) {
-        super.onActivityCreated(savedInstanceState)
-        binding.viewModel = viewModel
-
-        viewModel.dogImageLiveData.observe(viewLifecycleOwner, Observer {
+        viewModel.dogImageLiveData.observe(viewLifecycleOwner) {
+            binding.loading.visibility = View.GONE
             it?.result?.let { images ->
                 images.forEach { imageUrl ->
                     val changed = adapter.addImage(imageUrl)
-                    if (changed && isListAtTop()) list_images.scrollToPosition(0)
+                    if (changed && isListAtTop()) binding.listImages.scrollToPosition(0)
                 }
             }
             it?.error?.let { error ->
                 handleError(error)
             }
-        })
-
+        }
     }
 
     private fun isListAtTop(): Boolean {
-        return (list_images.layoutManager as LinearLayoutManager).findFirstCompletelyVisibleItemPosition() == 0
+        return (binding.listImages.layoutManager as LinearLayoutManager).findFirstCompletelyVisibleItemPosition() == 0
     }
 
     private fun onImageClicked(imageUrl: String) {
@@ -103,20 +97,20 @@ class MainFragment : BaseFragment() {
             .show()
     }
 
-    fun saveImage(imageUrl: String) {
+    private fun saveImage(imageUrl: String) {
         lastSelectedImage = imageUrl
         if (checkWritePermissions()) {
             getImageBitmap(imageUrl) { saveImageBitmap(it) }
         } else {
             ActivityCompat.requestPermissions(
-                activity!!,
+                requireActivity(),
                 arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
                 REQUEST_CODE_CHECK_PERMISSIONS_SAVE
             )
         }
     }
 
-    fun shareImage(imageUrl: String) {
+    private fun shareImage(imageUrl: String) {
         lastSelectedImage = imageUrl
         val ctx = context ?: return
         if (checkWritePermissions()) {
@@ -132,14 +126,14 @@ class MainFragment : BaseFragment() {
                     Intent(Intent.ACTION_SEND).apply {
                         type = "image/*"
                         putExtra(Intent.EXTRA_STREAM, uri)
-                    }.also {
-                        startActivity(Intent.createChooser(it, "Share Image"))
+                    }.also { intent ->
+                        startActivity(Intent.createChooser(intent, "Share Image"))
                     }
                 }
             }
         } else {
             ActivityCompat.requestPermissions(
-                activity!!,
+                requireActivity(),
                 arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
                 REQUEST_CODE_CHECK_PERMISSIONS_SHARE
             )
@@ -149,7 +143,7 @@ class MainFragment : BaseFragment() {
 
     private fun checkWritePermissions(): Boolean {
         return ActivityCompat.checkSelfPermission(
-            activity!!, Manifest.permission.WRITE_EXTERNAL_STORAGE
+            requireActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE
         ) == PackageManager.PERMISSION_GRANTED
     }
 

@@ -6,12 +6,16 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.DialogFragment
 import com.daniribalbert.autodogs.R
+import com.daniribalbert.autodogs.databinding.DialogFullScreenImageBinding
 import com.daniribalbert.autodogs.utils.extensions.loadImageUrl
-import kotlinx.android.synthetic.main.dialog_full_screen_image.*
 
 class FullScreenImageDialogFragment : DialogFragment() {
 
     private val imageUrl by lazy { arguments?.getString(ARGS_IMAGE_URL, "") ?: "" }
+
+    private var _binding: DialogFullScreenImageBinding? = null
+    private val binding: DialogFullScreenImageBinding
+        get() = _binding!!
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,15 +26,14 @@ class FullScreenImageDialogFragment : DialogFragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? = inflater.inflate(R.layout.dialog_full_screen_image, container, false)
+    ): View {
+        _binding = DialogFullScreenImageBinding.inflate(inflater, container, false)
+        return binding.root
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        image.loadImageUrl(imageUrl)
-    }
-
-    override fun onActivityCreated(savedInstanceState: Bundle?) {
-        super.onActivityCreated(savedInstanceState)
+        binding.image.loadImageUrl(imageUrl)
         dialog?.window?.attributes?.windowAnimations = R.style.DialogScaleAnimation
     }
 
